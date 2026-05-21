@@ -4,7 +4,6 @@ import tempfile
 import os
 from gtts import gTTS
 from deep_translator import GoogleTranslator
-import random
 
 st.set_page_config(
     page_title="Sign Language Book – Gesner Deslandes",
@@ -86,7 +85,7 @@ def translate_text(text, target_lang):
     except:
         return text
 
-# ---------- Text-to-speech helper ----------
+# ---------- Text-to-speech helper (removes speaker names from audio) ----------
 def text_to_speech(text, lang_code):
     if not text:
         return ""
@@ -107,50 +106,39 @@ def text_to_speech(text, lang_code):
     except Exception as e:
         return f"<p>Audio error: {e}</p>"
 
-# ---------- Generate 20 chapters with named conversations ----------
-# List of name pairs for chapters (cycles after 6)
-name_pairs = [
-    ("Gesner", "Junior"),
-    ("Roosevelt", "Babas"),
-    ("Ita", "Tiboul"),
-    ("Mona", "Marleine"),
-    ("Joel", "Jacqueline"),
-    ("Delance", "Fedelia")
-]
-
+# ---------- Generate 20 chapters with Gesner & Junior conversations ----------
 def generate_chapter(ch_num):
-    # Get name pair for this chapter
-    pair_idx = (ch_num - 1) % len(name_pairs)
-    name1, name2 = name_pairs[pair_idx]
-    
-    # Three different conversation topics per chapter, using the same names
+    # Three different conversation topics per chapter (vary slightly by chapter number)
     topics = [
-        f"Greetings and Introductions",
-        f"Daily Routine",
-        f"Hobbies and Interests"
+        f"Greetings and Introductions – Part {ch_num}",
+        f"Daily Routine – Day {ch_num}",
+        f"Hobbies and Interests – Variation {ch_num}"
     ]
     conversations = []
     for t_idx, topic in enumerate(topics):
-        # Create a realistic dialogue
-        lines = [
-            f"{name1}: Hello {name2}! How are you today? (Chapter {ch_num}, {topic})",
-            f"{name2}: Hi {name1}! I'm doing great, thank you. And you?",
-            f"{name1}: I'm fine too. Did you practice sign language yesterday?",
-            f"{name2}: Yes, I learned many new signs. Would you like to see?",
-            f"{name1}: Of course! That would be wonderful.",
-            f"{name2}: Let's start with the sign for 'hello' – wave your hand.",
-            f"{name1}: Oh, I see. What about 'thank you'?",
-            f"{name2}: You touch your chin with your fingertips and move forward.",
-            f"{name1}: That's beautiful. I will practice more.",
-            f"{name2}: Me too. See you tomorrow!"
+        # Create a realistic dialogue between Gesner and Junior (visible names but removed from audio)
+        lines_with_names = [
+            f"Gesner: Hello Junior! How are you today? (Chapter {ch_num}, {topic})",
+            f"Junior: Hi Gesner! I'm doing great, thank you. And you?",
+            f"Gesner: I'm fine too. Did you practice sign language yesterday?",
+            f"Junior: Yes, I learned many new signs. Would you like to see?",
+            f"Gesner: Of course! That would be wonderful.",
+            f"Junior: Let's start with the sign for 'hello' – wave your hand.",
+            f"Gesner: Oh, I see. What about 'thank you'?",
+            f"Junior: You touch your chin with your fingertips and move forward.",
+            f"Gesner: That's beautiful. I will practice more.",
+            f"Junior: Me too. See you tomorrow!"
         ]
+        # For audio, remove the "Name: " prefix (keep only the spoken words)
+        spoken_lines = [line.split(": ", 1)[1] if ": " in line else line for line in lines_with_names]
+        full_spoken_text = " ".join(spoken_lines)
         conversations.append({
             "title": f"Conversation {t_idx+1}: {topic}",
-            "lines": lines,
-            "full_text": " ".join(lines)
+            "lines_with_names": lines_with_names,   # for display
+            "spoken_text": full_spoken_text         # for audio (no names)
         })
     
-    # Vocabulary (same across chapters but could be varied)
+    # Vocabulary (same across chapters for consistency)
     vocab = [
         {"word": "hello", "sign_desc": "👋 Wave hand near temple"},
         {"word": "thank you", "sign_desc": "🤟 Touch chin and move forward"},
@@ -165,7 +153,7 @@ def generate_chapter(ch_num):
         {"question": "True or False: Sign language is the same worldwide.", "options": ["True", "False"], "answer": "False"}
     ]
     return {
-        "title": f"Chapter {ch_num}: Conversational Signs with {name1} & {name2}",
+        "title": f"Chapter {ch_num}: Gesner & Junior Sign Conversation",
         "conversations": conversations,
         "vocabulary": vocab,
         "grammar": grammar,
@@ -233,16 +221,16 @@ def main_app():
     st.markdown("---")
 
     # ---------- Conversations ----------
-    st.markdown("## 💬 Live Conversations")
+    st.markdown("## 💬 Gesner & Junior Live Conversations")
     for idx, conv in enumerate(ch_data["conversations"]):
         with st.expander(f"🗣️ {translate_text(conv['title'], st.session_state.language)}"):
-            # Display conversation lines
-            for line in conv["lines"]:
+            # Display conversation lines with names
+            for line in conv["lines_with_names"]:
                 st.markdown(f"- {translate_text(line, st.session_state.language)}")
-            # Audio for the entire conversation
-            if st.button(f"🔊 Play Full Conversation {idx+1}", key=f"conv_audio_{st.session_state.chapter}_{idx}"):
-                full_text_translated = translate_text(conv["full_text"], st.session_state.language)
-                audio_html = text_to_speech(full_text_translated, st.session_state.language)
+            # Audio button – plays only the spoken words (names removed)
+            if st.button(f"🔊 Play Conversation {idx+1} (Audio – no names)", key=f"conv_audio_{st.session_state.chapter}_{idx}"):
+                spoken_text_translated = translate_text(conv["spoken_text"], st.session_state.language)
+                audio_html = text_to_speech(spoken_text_translated, st.session_state.language)
                 st.markdown(audio_html, unsafe_allow_html=True)
 
     # ---------- Vocabulary ----------
