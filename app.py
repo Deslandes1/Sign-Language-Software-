@@ -39,20 +39,6 @@ st.markdown(
         color: white !important;
         border-radius: 30px !important;
     }
-    .chapter-box {
-        background: white;
-        border-radius: 20px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .conversation {
-        background: #f0f4f8;
-        border-left: 5px solid #4a90e2;
-        padding: 1rem;
-        margin: 1rem 0;
-        border-radius: 15px;
-    }
     .vocab-word {
         background: #fff3e0;
         display: inline-block;
@@ -78,7 +64,7 @@ if "translations" not in st.session_state:
 if "audio_cache" not in st.session_state:
     st.session_state.audio_cache = {}
 
-# ---------- Language mapping for deep_translator ----------
+# ---------- Language mapping ----------
 LANG_CODES = {
     "English": "en",
     "French": "fr",
@@ -86,7 +72,7 @@ LANG_CODES = {
     "Haitian Creole": "ht"
 }
 
-# ---------- Translation helper (cached) ----------
+# ---------- Translation helper ----------
 def translate_text(text, target_lang):
     if target_lang == "en":
         return text
@@ -97,11 +83,10 @@ def translate_text(text, target_lang):
         translated = GoogleTranslator(source='en', target=target_lang).translate(text)
         st.session_state.translations[cache_key] = translated
         return translated
-    except Exception as e:
-        st.warning(f"Translation error: {e}")
+    except:
         return text
 
-# ---------- Text-to-speech helper (cached) ----------
+# ---------- Text-to-speech helper ----------
 def text_to_speech(text, lang_code):
     if not text:
         return ""
@@ -122,37 +107,66 @@ def text_to_speech(text, lang_code):
     except Exception as e:
         return f"<p>Audio error: {e}</p>"
 
-# ---------- Generate content for 20 chapters (master in English) ----------
+# ---------- Generate 20 chapters with named conversations ----------
+# List of name pairs for chapters (cycles after 6)
+name_pairs = [
+    ("Gesner", "Junior"),
+    ("Roosevelt", "Babas"),
+    ("Ita", "Tiboul"),
+    ("Mona", "Marleine"),
+    ("Joel", "Jacqueline"),
+    ("Delance", "Fedelia")
+]
+
 def generate_chapter(ch_num):
-    # Each chapter has dynamic content based on chapter number
-    base_greeting = f"Chapter {ch_num}: Everyday Signs"
-    convs = []
-    for i in range(1, 4):
-        convs.append({
-            "title": f"Conversation {i}: Meeting someone",
-            "lines": [
-                f"Person A: Hello! What is your name? (Chapter {ch_num})",
-                "Person B: My name is Alex. Nice to meet you.",
-                "Person A: Nice to meet you too. How are you?",
-                "Person B: I am fine, thank you."
-            ]
+    # Get name pair for this chapter
+    pair_idx = (ch_num - 1) % len(name_pairs)
+    name1, name2 = name_pairs[pair_idx]
+    
+    # Three different conversation topics per chapter, using the same names
+    topics = [
+        f"Greetings and Introductions",
+        f"Daily Routine",
+        f"Hobbies and Interests"
+    ]
+    conversations = []
+    for t_idx, topic in enumerate(topics):
+        # Create a realistic dialogue
+        lines = [
+            f"{name1}: Hello {name2}! How are you today? (Chapter {ch_num}, {topic})",
+            f"{name2}: Hi {name1}! I'm doing great, thank you. And you?",
+            f"{name1}: I'm fine too. Did you practice sign language yesterday?",
+            f"{name2}: Yes, I learned many new signs. Would you like to see?",
+            f"{name1}: Of course! That would be wonderful.",
+            f"{name2}: Let's start with the sign for 'hello' – wave your hand.",
+            f"{name1}: Oh, I see. What about 'thank you'?",
+            f"{name2}: You touch your chin with your fingertips and move forward.",
+            f"{name1}: That's beautiful. I will practice more.",
+            f"{name2}: Me too. See you tomorrow!"
+        ]
+        conversations.append({
+            "title": f"Conversation {t_idx+1}: {topic}",
+            "lines": lines,
+            "full_text": " ".join(lines)
         })
+    
+    # Vocabulary (same across chapters but could be varied)
     vocab = [
         {"word": "hello", "sign_desc": "👋 Wave hand near temple"},
-        {"word": "name", "sign_desc": "✋ Tap fingers on chin"},
-        {"word": "nice", "sign_desc": "👍 Thumbs up with smile"},
-        {"word": "meet", "sign_desc": "🤝 Bring index fingers together"},
-        {"word": "fine", "sign_desc": "👌 OK sign near chest"}
+        {"word": "thank you", "sign_desc": "🤟 Touch chin and move forward"},
+        {"word": "practice", "sign_desc": "🖐️ Repeated hand motion"},
+        {"word": "learn", "sign_desc": "📖 Take from hand to forehead"},
+        {"word": "beautiful", "sign_desc": "👐 Open hands circling face"}
     ]
-    grammar = "In sign language, word order is often Subject-Object-Verb. Facial expressions convey tone."
+    grammar = "Sign language uses hand shapes, facial expressions, and body movements. Word order is often Subject-Object-Verb."
     quiz = [
-        {"question": "What is the sign for 'hello'?", "options": ["👋 Wave", "✌️ Peace sign", "👍 Thumbs up"], "answer": "👋 Wave"},
-        {"question": "True or False: Sign language is universal.", "options": ["True", "False"], "answer": "False"},
-        {"question": "Which hand shape means 'name'?", "options": ["✋ Tap chin", "👌 OK sign", "✊ Fist"], "answer": "✋ Tap chin"}
+        {"question": "What is the sign for 'hello'?", "options": ["👋 Wave", "✌️ Peace", "👍 Thumbs up"], "answer": "👋 Wave"},
+        {"question": "Which body part is used for 'thank you'?", "options": ["Chin", "Forehead", "Chest"], "answer": "Chin"},
+        {"question": "True or False: Sign language is the same worldwide.", "options": ["True", "False"], "answer": "False"}
     ]
     return {
-        "title": base_greeting,
-        "conversations": convs,
+        "title": f"Chapter {ch_num}: Conversational Signs with {name1} & {name2}",
+        "conversations": conversations,
         "vocabulary": vocab,
         "grammar": grammar,
         "quiz": quiz
@@ -189,7 +203,7 @@ def main_app():
         new_lang = LANG_CODES[lang_display]
         if new_lang != st.session_state.language:
             st.session_state.language = new_lang
-            st.session_state.translations = {}  # clear cache
+            st.session_state.translations = {}
             st.rerun()
         st.markdown("---")
         chapter_num = st.selectbox("📖 Select Chapter", list(range(1, 21)), index=st.session_state.chapter-1)
@@ -201,12 +215,10 @@ def main_app():
             st.session_state.audio_cache = {}
             st.rerun()
 
-    # Main page header
     st.markdown("# 🤟 Sign Language Book Software")
     st.markdown("### Built by **Gesner Deslandes**")
     st.markdown("---")
 
-    # Load current chapter content
     ch_data = generate_chapter(st.session_state.chapter)
     ch_title = translate_text(ch_data["title"], st.session_state.language)
 
@@ -221,14 +233,15 @@ def main_app():
     st.markdown("---")
 
     # ---------- Conversations ----------
-    st.markdown("## 💬 Conversations")
+    st.markdown("## 💬 Live Conversations")
     for idx, conv in enumerate(ch_data["conversations"]):
         with st.expander(f"🗣️ {translate_text(conv['title'], st.session_state.language)}"):
+            # Display conversation lines
             for line in conv["lines"]:
                 st.markdown(f"- {translate_text(line, st.session_state.language)}")
-            full_text = " ".join(conv["lines"])
-            full_text_translated = translate_text(full_text, st.session_state.language)
-            if st.button(f"🔊 Play Conversation {idx+1}", key=f"conv_audio_{st.session_state.chapter}_{idx}"):
+            # Audio for the entire conversation
+            if st.button(f"🔊 Play Full Conversation {idx+1}", key=f"conv_audio_{st.session_state.chapter}_{idx}"):
+                full_text_translated = translate_text(conv["full_text"], st.session_state.language)
                 audio_html = text_to_speech(full_text_translated, st.session_state.language)
                 st.markdown(audio_html, unsafe_allow_html=True)
 
