@@ -3,18 +3,16 @@ import base64
 import tempfile
 import os
 from gtts import gTTS
-from googletrans import Translator
-import hashlib
+from deep_translator import GoogleTranslator
 import random
 
-# ---------- Page config ----------
 st.set_page_config(
     page_title="Sign Language Book – Gesner Deslandes",
     page_icon="🤟",
     layout="wide"
 )
 
-# ---------- Custom CSS for colors, spinning globe, readability ----------
+# ---------- Custom CSS ----------
 st.markdown(
     """
     <style>
@@ -63,17 +61,6 @@ st.markdown(
         border-radius: 50px;
         font-weight: bold;
     }
-    .quiz-option {
-        background: #e2f0fa;
-        padding: 0.5rem;
-        margin: 0.3rem 0;
-        border-radius: 10px;
-    }
-    footer {
-        text-align: center;
-        margin-top: 2rem;
-        color: #6c757d;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -87,14 +74,11 @@ if "language" not in st.session_state:
 if "chapter" not in st.session_state:
     st.session_state.chapter = 1
 if "translations" not in st.session_state:
-    st.session_state.translations = {}   # cache for translated content
+    st.session_state.translations = {}
 if "audio_cache" not in st.session_state:
     st.session_state.audio_cache = {}
 
-# ---------- Translator for dynamic text ----------
-translator = Translator()
-
-# ---------- Language codes ----------
+# ---------- Language mapping for deep_translator ----------
 LANG_CODES = {
     "English": "en",
     "French": "fr",
@@ -102,7 +86,7 @@ LANG_CODES = {
     "Haitian Creole": "ht"
 }
 
-# ---------- Helper: translate text (cached) ----------
+# ---------- Translation helper (cached) ----------
 def translate_text(text, target_lang):
     if target_lang == "en":
         return text
@@ -110,13 +94,14 @@ def translate_text(text, target_lang):
     if cache_key in st.session_state.translations:
         return st.session_state.translations[cache_key]
     try:
-        translated = translator.translate(text, dest=target_lang).text
+        translated = GoogleTranslator(source='en', target=target_lang).translate(text)
         st.session_state.translations[cache_key] = translated
         return translated
-    except:
-        return f"[{target_lang}] {text}"
+    except Exception as e:
+        st.warning(f"Translation error: {e}")
+        return text
 
-# ---------- Helper: text-to-speech (cached, returns HTML audio tag) ----------
+# ---------- Text-to-speech helper (cached) ----------
 def text_to_speech(text, lang_code):
     if not text:
         return ""
@@ -137,24 +122,21 @@ def text_to_speech(text, lang_code):
     except Exception as e:
         return f"<p>Audio error: {e}</p>"
 
-# ---------- Content for 20 chapters (English master) ----------
-# To keep the code manageable, we generate a template for each chapter.
-# In real use, replace with actual sign language content.
-chapters_content = []
-for ch in range(1, 21):
-    # Conversations (3 per chapter, numbered)
+# ---------- Generate content for 20 chapters (master in English) ----------
+def generate_chapter(ch_num):
+    # Each chapter has dynamic content based on chapter number
+    base_greeting = f"Chapter {ch_num}: Everyday Signs"
     convs = []
     for i in range(1, 4):
         convs.append({
             "title": f"Conversation {i}: Meeting someone",
             "lines": [
-                f"Person A: Hello! What is your name? (Chapter {ch})",
-                f"Person B: My name is Chris. Nice to meet you.",
-                f"Person A: Nice to meet you too. How are you?",
-                f"Person B: I am fine, thank you."
+                f"Person A: Hello! What is your name? (Chapter {ch_num})",
+                "Person B: My name is Alex. Nice to meet you.",
+                "Person A: Nice to meet you too. How are you?",
+                "Person B: I am fine, thank you."
             ]
         })
-    # Vocabulary (5 words per chapter)
     vocab = [
         {"word": "hello", "sign_desc": "👋 Wave hand near temple"},
         {"word": "name", "sign_desc": "✋ Tap fingers on chin"},
@@ -162,21 +144,19 @@ for ch in range(1, 21):
         {"word": "meet", "sign_desc": "🤝 Bring index fingers together"},
         {"word": "fine", "sign_desc": "👌 OK sign near chest"}
     ]
-    # Grammar note (if any)
     grammar = "In sign language, word order is often Subject-Object-Verb. Facial expressions convey tone."
-    # Quiz (3 questions)
     quiz = [
         {"question": "What is the sign for 'hello'?", "options": ["👋 Wave", "✌️ Peace sign", "👍 Thumbs up"], "answer": "👋 Wave"},
         {"question": "True or False: Sign language is universal.", "options": ["True", "False"], "answer": "False"},
         {"question": "Which hand shape means 'name'?", "options": ["✋ Tap chin", "👌 OK sign", "✊ Fist"], "answer": "✋ Tap chin"}
     ]
-    chapters_content.append({
-        "title": f"Chapter {ch}: Basic Greetings",
+    return {
+        "title": base_greeting,
         "conversations": convs,
         "vocabulary": vocab,
         "grammar": grammar,
         "quiz": quiz
-    })
+    }
 
 # ---------- Login page ----------
 def login():
@@ -197,7 +177,6 @@ def login():
 
 # ---------- Main app ----------
 def main_app():
-    # Sidebar with spinning globe, info, language, logout
     with st.sidebar:
         st.markdown('<div class="spinning-globe">🌐</div>', unsafe_allow_html=True)
         st.markdown("### GlobalInternet.py")
@@ -206,14 +185,13 @@ def main_app():
         st.markdown("📧 deslandes78@gmail.com")
         st.markdown("📞 (509) 4738-5663")
         st.markdown("---")
-        # Language selection
         lang_display = st.selectbox("🌐 Language", list(LANG_CODES.keys()), index=0)
         new_lang = LANG_CODES[lang_display]
         if new_lang != st.session_state.language:
             st.session_state.language = new_lang
+            st.session_state.translations = {}  # clear cache
             st.rerun()
         st.markdown("---")
-        # Chapter selector
         chapter_num = st.selectbox("📖 Select Chapter", list(range(1, 21)), index=st.session_state.chapter-1)
         st.session_state.chapter = chapter_num
         st.markdown("---")
@@ -223,16 +201,15 @@ def main_app():
             st.session_state.audio_cache = {}
             st.rerun()
 
-    # Main page title
+    # Main page header
     st.markdown("# 🤟 Sign Language Book Software")
     st.markdown("### Built by **Gesner Deslandes**")
     st.markdown("---")
 
-    # Get current chapter data
-    ch_data = chapters_content[st.session_state.chapter - 1]
+    # Load current chapter content
+    ch_data = generate_chapter(st.session_state.chapter)
     ch_title = translate_text(ch_data["title"], st.session_state.language)
 
-    # Chapter header with audio
     col1, col2 = st.columns([4,1])
     with col1:
         st.subheader(ch_title)
@@ -243,21 +220,19 @@ def main_app():
 
     st.markdown("---")
 
-    # ---------- CONVERSATIONS ----------
+    # ---------- Conversations ----------
     st.markdown("## 💬 Conversations")
     for idx, conv in enumerate(ch_data["conversations"]):
         with st.expander(f"🗣️ {translate_text(conv['title'], st.session_state.language)}"):
             for line in conv["lines"]:
-                translated_line = translate_text(line, st.session_state.language)
-                st.markdown(f"- {translated_line}")
-            # Audio for whole conversation (concatenated)
+                st.markdown(f"- {translate_text(line, st.session_state.language)}")
             full_text = " ".join(conv["lines"])
             full_text_translated = translate_text(full_text, st.session_state.language)
             if st.button(f"🔊 Play Conversation {idx+1}", key=f"conv_audio_{st.session_state.chapter}_{idx}"):
                 audio_html = text_to_speech(full_text_translated, st.session_state.language)
                 st.markdown(audio_html, unsafe_allow_html=True)
 
-    # ---------- VOCABULARY ----------
+    # ---------- Vocabulary ----------
     st.markdown("## 📖 Vocabulary & Signs")
     vocab_cols = st.columns(3)
     for i, word_item in enumerate(ch_data["vocabulary"]):
@@ -270,7 +245,7 @@ def main_app():
                 audio_html = text_to_speech(word, st.session_state.language)
                 st.markdown(audio_html, unsafe_allow_html=True)
 
-    # ---------- GRAMMAR ----------
+    # ---------- Grammar ----------
     st.markdown("## 📚 Grammar")
     grammar_text = translate_text(ch_data["grammar"], st.session_state.language)
     st.info(grammar_text)
@@ -278,7 +253,7 @@ def main_app():
         audio_html = text_to_speech(grammar_text, st.session_state.language)
         st.markdown(audio_html, unsafe_allow_html=True)
 
-    # ---------- QUIZ ----------
+    # ---------- Quiz ----------
     st.markdown("## ✅ Quiz – Test Yourself")
     quiz = ch_data["quiz"]
     score = 0
@@ -294,11 +269,9 @@ def main_app():
             st.error(f"❌ Wrong. Correct answer: {answer}")
     st.markdown(f"**Your score: {score}/{len(quiz)}**")
 
-    # Footer
     st.markdown("---")
     st.markdown("<footer>© 2025 Gesner Deslandes – GlobalInternet.py – All rights reserved</footer>", unsafe_allow_html=True)
 
-# ---------- Run ----------
 if not st.session_state.authenticated:
     login()
 else:
